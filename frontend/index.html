@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Sistema Empresa de Serviços</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>Sistema Empresa de Serviços</h1>
+        </header>
+
+        <section class="menu">
+            <button id="consulta1">Contratos acima de 3000</button>
+            <button id="consulta2">Média por estado</button>
+            <button id="consulta3">Funcionários e departamentos</button>
+            <button id="consulta4">Clientes e contratos</button>
+            <button id="consulta5">Contratos com alocação</button>
+            <button id="inserir">Inserir Cliente</button>
+            <button id="remover">Remover Cliente</button>
+        </section>
+
+        <section id="form-inserir" class="form" hidden>
+            <h2>Inserir cliente</h2>
+            <form id="cliente-form">
+                <input name="nome" placeholder="Nome *" required>
+                <input name="status" placeholder="Status (Ativo/Inativo)">
+                <input name="email" type="email" placeholder="E-mail">
+                <input name="telefone" placeholder="Telefone">
+                <input name="cep" placeholder="CEP">
+                <input name="rua" placeholder="Rua">
+                <input name="numero" placeholder="Número">
+                <input name="bairro" placeholder="Bairro">
+                <input name="cidade" placeholder="Cidade">
+                <input name="estado" placeholder="UF (ex: CE)" maxlength="2">
+                <button type="submit">Salvar</button>
+            </form>
+        </section>
+
+        <section id="form-remover" class="form" hidden>
+            <h2>Remover cliente</h2>
+            <form id="remover-form">
+                <input name="id" type="number" min="1" placeholder="ID do cliente" required>
+                <button type="submit">Remover</button>
+            </form>
+        </section>
+
+        <section class="resultado">
+            <h2>Resultados</h2>
+            <div id="resultado-box">
+                Os resultados aparecerão aqui.
+            </div>
+        </section>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
