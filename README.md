@@ -1,166 +1,280 @@
-SISTEMA EMPRESA DE SERVIÇOS
-===========================
+# Marketing Agency Database
 
-Projeto da disciplina Banco de Dados I (Sistemas e Mídias Digitais),
-desenvolvido do zero: modelagem conceitual (MER), diagrama (DER), esquema
-relacional textual, scripts SQL e uma aplicação web que consome o banco.
+An academic relational database project developed for the Database I course in the Systems and Digital Media undergraduate program at the Federal University of Ceará (UFC).
 
-O domínio é uma agência de serviços digitais (marketing, audiovisual, sites,
-e-commerce) que vende pacotes a clientes (pessoa fisica ou juridica),
-formaliza contratos com parcelas de pagamento e aloca funcionários de
-diferentes departamentos aos contratos.
+The project models a digital services agency and connects a **PostgreSQL database** to a **Python/Flask API** and a browser interface.
 
+## Overview
 
-TECNOLOGIAS
------------
+The agency sells service packages to individual and corporate clients, manages contracts and payment installments, and assigns employees from different departments to contracts.
 
-- PostgreSQL: banco de dados relacional
-- Python + Flask: API REST
-- psycopg2: conexão com o PostgreSQL
-- HTML, CSS e JavaScript: interface web
+The implementation demonstrates:
 
+- Relational modeling with primary, foreign, and composite keys.
+- SQL queries using joins, subqueries, aggregation, and existence checks.
+- Referential integrity and selective cascading deletes.
+- Database integration through a Flask API.
+- Client registration and deletion through a web interface.
 
-MODELAGEM
----------
+## Architecture
 
-ODER estão na pasta docs/ (docs/mer.png e docs/der.png).
+```mermaid
+flowchart LR
+    UI["HTML / CSS / JavaScript"] -->|"HTTP requests"| API["Python / Flask API"]
+    API -->|"SQL through psycopg2"| DB[("PostgreSQL")]
+    DB --> API
+    API -->|"JSON responses"| UI
+```
 
-Relações entre as tabelas:
+## Technology Stack
 
-- Cliente possui vários e-mails (Cliente_Email) e vários telefones
-  (Cliente_Telefone)
-- Cliente é especializado em Pessoa_Fisica ou Pessoa_Juridica
-- Cliente assina vários Contratos
-- Pacotes é contemplado em vários Contratos
-- Contrato gera varias Parcelas (entidade fraca)
-- Contrato e Funcionario se relacionam em N:N pela tabela Recebe
-- Departamento aloca vários Funcionários
+| Component | Technologies |
+|---|---|
+| Database | PostgreSQL |
+| Backend | Python, Flask, psycopg2 |
+| Frontend | HTML, CSS, JavaScript |
+| Configuration | python-dotenv |
+| Local cross-origin requests | Flask-CORS |
 
+## Data Model
 
-ESQUEMA RELACIONAL (TEXTUAL)
-----------------------------
+The database contains 11 tables:
 
-    Cliente(Id_Cliente, nome, status, email, telefone, CEP, Rua, numero,
-            cidade, bairro, estado)
+| Table | Purpose |
+|---|---|
+| `Cliente` | Client details and primary contact information |
+| `Cliente_Email` | Additional client email addresses |
+| `Cliente_Telefone` | Additional client phone numbers |
+| `Pessoa_Fisica` | Individual client details |
+| `Pessoa_Juridica` | Corporate client details |
+| `Departamento` | Employee departments |
+| `Funcionario` | Employees and department assignments |
+| `Pacotes` | Service packages |
+| `Contrato` | Client contracts |
+| `Parcela` | Contract payment installments |
+| `Recebe` | Employee assignments to contracts |
 
-    Cliente_Email(Id_Cliente, Email)
-        Id_Cliente referencia Cliente
+### Modeling Decisions
 
-    Cliente_Telefone(Id_Cliente, Telefone)
-        Id_Cliente referencia Cliente
+- **Client specialization:** Individual and corporate client details are stored in separate tables referencing `Cliente`.
+- **Additional contacts:** Email addresses and phone numbers can be stored in dedicated tables alongside the primary contact fields.
+- **Dependent installments:** Each installment is identified by the composite key `(Id_Contrato, Numero_Parcela)`.
+- **Many-to-many assignments:** `Recebe` connects employees to contracts using `(Id_Contrato, CPF_Funcionario)` as its primary key.
+- **Selective cascading deletes:** Deleting a client also removes dependent contact and specialization records. Clients referenced by contracts cannot be deleted.
+- **Monetary values:** Contract and installment amounts use PostgreSQL `NUMERIC` columns.
 
-    Pessoa_Fisica(Id_Cliente, CPF, Data_Nascimento)
-        Id_Cliente referencia Cliente
+The schema does not enforce that every client belongs to exactly one specialization.
 
-    Pessoa_Juridica(Id_Cliente, CNPJ, Data_fundacao)
-        Id_Cliente referencia Cliente
+### Entity–Relationship Diagram
 
-    Departamento(Nome_Departamento, Setor)
+![Entity–relationship diagram](docs/DER.png)
 
-    Funcionario(CPF, Nome_Departamento, Nome, Cargo)
-        Nome_Departamento referencia Departamento
+## SQL Queries
 
-    Pacotes(Nome_Pacote, Descricao, Restricoes, Valor_Base)
+| Endpoint | Business question | SQL concepts |
+|---|---|---|
+| `GET /consulta1` | Which clients have at least one contract worth 3,000 or more? | `IN` subquery |
+| `GET /consulta2` | Which states have an average contract value above 1,000? | `INNER JOIN`, `AVG`, `GROUP BY`, `HAVING` |
+| `GET /consulta3` | Which departments do employees belong to? | `INNER JOIN` |
+| `GET /consulta4` | Which clients have contracts, including those without one? | `LEFT JOIN` |
+| `GET /consulta5` | Which contracts have an employee assigned? | Correlated `EXISTS` subquery |
 
-    Contrato(Id_Contrato, Id_Cliente, Nome_Pacote, Data_Inicio,
-             Data_Termino, Valor_Acordado, Tipo_Cobranca, Status_Pagamento,
-             Servicos_entregues)
-        Id_Cliente referencia Cliente
-        Nome_Pacote referencia Pacotes
+Clients without contracts are included in `/consulta4`; clients with multiple contracts may appear in multiple rows.
 
-    Parcela(Id_Contrato, Numero_Parcela, Data_Vencimento, Status_Pagamento,
-            Valor_Parcela)
-        Id_Contrato referencia Contrato
+## Client Operations
 
-    Recebe(Id_Contrato, CPF_Funcionario, ID_Alocacao, Atribuicao_servico,
-           Data)
-        Id_Contrato referencia Contrato
-        CPF_Funcionario referencia Funcionario
+### Create a client
 
-Decisões de modelagem:
+```http
+POST /clientes
+Content-Type: application/json
+```
 
-- Especialização de Cliente: Pessoa_Fisica e Pessoa_Juridica guardam os dados
-  específicos (CPF/CNPJ) e compartilham o Id_Cliente.
-- Atributos multivalorados: e-mails e telefones adicionais ficam em tabelas
-  próprias.
-- Entidade fraca: Parcela depende de Contrato e é identificada por
-  (Id_Contrato, Numero_Parcela).
-- Relacionamento N:N: Recebe liga funcionários a contratos e guarda a
-  atribuição do servico e a data.
-- Remoção em cascata: ao remover um cliente, seus e-mails, telefones e dados
-  de PF/PJ também são removidos. Clientes com contrato não podem ser
-  removidos.
+Example request:
 
+```json
+{
+  "nome": "Demo Client",
+  "status": "Ativo",
+  "cidade": "Fortaleza",
+  "estado": "CE"
+}
+```
 
-ESTRUTURA DO REPOSITÓRIO
-------------------------
+The API requires a nonempty name. When provided, the state field must contain two characters.
 
-    db/schema.sql          criação das tabelas
-    db/seed.sql            dados de exemplo
-    backend/app.py         API Flask
-    backend/.env.example   modelo de configuração
-    frontend/              index.html, script.js, style.css
-    docs/                  MER, DER e demais documentos
+Successful requests return `201` and the new client ID.
 
+### Delete a client
 
-COMO RODAR
-----------
+```http
+DELETE /clientes/<id_cliente>
+```
 
-Pré-requisitos: PostgreSQL (https://www.postgresql.org/download/) e
-Python 3.10 ou superior.
+Responses:
 
-1) Criar o banco e popular (use -p PORTA se o seu PostgreSQL não estiver na
-   porta 5432):
+- `200`: Client deleted.
+- `404`: Client not found.
+- `409`: Deletion blocked because the client has contracts.
 
-    psql -U postgres -c "CREATE DATABASE bd1 ENCODING 'UTF8' TEMPLATE template0;"
-    psql -U postgres -d bd1 -f db/schema.sql -f db/seed.sql
+Client creation and deletion use parameterized SQL statements.
 
-   No Windows, rode antes o comando abaixo no PowerShell para os acentos
-   serem lidos corretamente:
+## Repository Structure
 
-    $env:PGCLIENTENCODING = "UTF8"
+```text
+bd-agenciaMarketing/
+├── backend/
+│   ├── app.py
+│   └── requirements.txt
+├── db/
+│   ├── schema.sql
+│   └── seed.sql
+├── docs/
+│   └── DER.png
+├── frontend/
+│   ├── index.html
+│   ├── script.js
+│   └── style.css
+├── .gitignore
+└── README.md
+```
 
-2) Configurar a conexão:
+## Run Locally
 
-    cd backend
-    copy .env.example .env        (Linux/Mac: cp .env.example .env)
+### Prerequisites
 
-   Edite o arquivo .env com a porta, usuário e senha do seu PostgreSQL.
+- PostgreSQL running locally.
+- The `psql` command available in your terminal.
+- Python and pip.
+- A web browser.
 
-3) Instalar dependências e iniciar a API:
+### 1. Clone the repository
 
-    python -m venv .venv
-    .venv\Scripts\activate        (Linux/Mac: source .venv/bin/activate)
-    pip install -r requirements.txt
-    python app.py
+```bash
+git clone https://github.com/ArtemisMenezes/bd-agenciaMarketing.git
+cd bd-agenciaMarketing
+```
 
-   A API sobe em http://127.0.0.1:5000
+### 2. Create and populate the database
 
-4) Abrir a interface: abra o arquivo frontend/index.html no navegador.
+Run from the repository root against a new database.
 
+On Windows PowerShell, set the client encoding first:
 
-FUNCIONALIDADES
----------------
+```powershell
+$env:PGCLIENTENCODING = "UTF8"
+```
 
-Contratos acima de 3000   (GET /consulta1)
-    Clientes com contrato de valor maior ou igual a 3000 (subconsulta IN).
+Create the database:
 
-Média por estado          (GET /consulta2)
-    Média de valor dos contratos por estado, maior que 1000
-    (GROUP BY + HAVING).
+```bash
+psql -U postgres -c "CREATE DATABASE bd1 ENCODING 'UTF8' TEMPLATE template0;"
+```
 
-Funcionários e departamentos   (GET /consulta3)
-    Funcionários com cargo, departamento e setor (INNER JOIN).
+Create the tables:
 
-Clientes e contratos      (GET /consulta4)
-    Todos os clientes e seus contratos, mesmo sem contrato (LEFT JOIN).
+```bash
+psql -U postgres -d bd1 -v ON_ERROR_STOP=1 -f db/schema.sql
+```
 
-Contratos com alocação    (GET /consulta5)
-    Contratos que tem funcionário alocado (EXISTS).
+Load the sample records:
 
-Inserir Cliente           (POST /clientes)
-    Cadastra um novo cliente.
+```bash
+psql -U postgres -d bd1 -v ON_ERROR_STOP=1 -f db/seed.sql
+```
 
-Remover Cliente           (DELETE /clientes/<id>)
-    Remove um cliente pelo ID (bloqueado se houver contratos).
+If PostgreSQL uses a different port, add `-p YOUR_PORT` to each command.
 
+The scripts are intended for an initial setup. Running them again against populated tables can cause duplicate table or key errors.
+
+### 3. Configure the backend
+
+Create a file named `.env` inside `backend/`:
+
+```dotenv
+DB_HOST=localhost
+DB_NAME=bd1
+DB_USER=postgres
+DB_PASSWORD=your_local_database_password
+DB_PORT=5432
+```
+
+Replace the placeholder with your local password. The repository does not include an `.env.example` file.
+
+Never commit your `.env` file.
+
+### 4. Install dependencies and start the API
+
+**Windows — PowerShell:**
+
+```powershell
+cd backend
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe app.py
+```
+
+**macOS / Linux:**
+
+```bash
+cd backend
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
+.venv/bin/python app.py
+```
+
+The API connects to PostgreSQL during startup. Start the database and configure the connection before running the application.
+
+Visit:
+
+```text
+http://127.0.0.1:5000/
+```
+
+The expected response is:
+
+```text
+Servidor Flask + PostgreSQL funcionando!
+```
+
+### 5. Open the frontend
+
+Open `frontend/index.html` in your browser.
+
+Keep the backend running. The frontend is configured to send requests to `http://127.0.0.1:5000`.
+
+The interface is in Brazilian Portuguese.
+
+## Manual Verification
+
+After setup:
+
+1. Run each of the five queries from the interface.
+2. Confirm that results appear in a table.
+3. Create a demonstration client and note the returned ID.
+4. Delete that client using its ID.
+5. Attempt to delete a client referenced by a contract; the API should return `409`.
+
+These are suggested manual checks, not an automated test suite.
+
+## Results and Scope
+
+The repository includes a relational schema with 11 tables, sample data, five SQL query endpoints, and client creation and deletion.
+
+This documentation was checked against the source files. Database setup and application execution were not performed during the documentation review. No performance benchmarks are reported.
+
+## Limitations
+
+- The interface provides client creation and deletion, but no update operation.
+- Contracts, packages, employees, and installments do not have management endpoints.
+- The backend uses a single shared database connection without connection pooling.
+- Monetary values are converted from `Decimal` to floating-point numbers for JSON responses.
+- Authentication and authorization are not implemented.
+- The Flask server uses debug mode, and CORS is broadly enabled for local development.
+- Dependencies are listed without pinned versions.
+- Automated tests, migrations, and deployment configuration are not included.
+- The sample data supports query demonstrations; the application does not enforce a complete billing workflow.
+
+## Author
+
+[Ártemis Menezes Castelo](https://github.com/ArtemisMenezes)
